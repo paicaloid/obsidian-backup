@@ -1,4 +1,4 @@
-﻿# Projects
+# Projects
 > Source of truth is `Projects/` in this vault. This is a summary; latest status as of 2026-09.
 
 ## Active / recent
@@ -13,5 +13,7 @@
 - Wireless house POC: staff detection by uniform classifier; weak in dark areas.
 - PEA, Dusit Park Traffic, Congestion (forbidden area for cars), Neopolis, Deepvision, Internship (temporary): see their notes.
 
-## Local repos
-- `D:\git\expense-summary`
+## Personal projects (WSL, `/home/pai`)
+- `finance-tools` (`/home/pai/finance-tools`): active. Personal finance app: import bank statements, Review step, track shared expenses. Supports the retirement-saving goal in [[Goals]].
+- `wholesale-pos`: next. Go (hexagonal architecture) + PostgreSQL backend, React/Vue frontend; inventory, orders, invoices. Real project for Mook's father's family-run wholesale shop in Saraburi (no staff besides family). Built together with Mook, no launch date yet.
+- Superseded: `expense-tracker` (WSL, migrated into `finance-tools`) and `D:\git\expense-summary` (empty).

@@ -7,6 +7,10 @@ Keep it short and factual. Never store passwords, API keys, or ID/financial numb
 - [[About me]] - who I am, background, languages
 - [[Preferences]] - how I like answers, tools, style
 - [[Projects]] - what I'm working on
+- [[Life]] - home, family, gaming, fitness, hobbies
+- [[Goals]] - weight, retirement, second income
+- [[Health]] - InBody baseline and targets (sensitive)
+- [[Work History]] - career record for CV (jobs, skills, education)
 - [[People]] - collaborators and context
 - [[Decisions]] - dated log of choices and why
 - [[Inbox]] - quick captures to sort later
