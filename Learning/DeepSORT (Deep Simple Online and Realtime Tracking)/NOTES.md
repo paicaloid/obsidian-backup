@@ -1,0 +1,6 @@
+# Notes
+
+- User runs a global "caveman mode" in chat (terse fragments). Per that mode's own rule, code/commits/lessons/docs are written in full normal prose — lesson HTML and reference docs should stay clear and complete, not compressed. Chat replies stay terse; the artifacts do not.
+- User's home codebase for this mission: `/Users/pai/ws/real-time-core-pipeline` (additional working directory). The `deepvision` package inside it holds the tracker implementations.
+- Existing tracker classes for reference/contrast: `SORTTracker`, `ByteTracker`, `OCSORTTracker` (`deepvision/deepvision/tracker/`). No `DeepSORTTracker` exists yet — that's the eventual deliverable, after this mission's lessons are done.
+- 2026-09-11: asked for a from-scratch explanation of Kalman filter / Hungarian algorithm / Mahalanobis distance right after Lesson 0001, despite LR-0001 assuming operational fluency with SORT. Revise: running `SORTTracker` in prod gave *operational* familiarity (knows the pipeline, knows what breaks), not necessarily the underlying math. Don't assume the math is known just because the system is — check before skipping fundamentals in future lessons. `filterpy`'s `KalmanFilter` state layout in `kalman_box.py:28` (`dim_x=7`: cx, cy, aspect, height, vx, vy, v_aspect) is a good concrete anchor for Kalman-filter explanations in this codebase.

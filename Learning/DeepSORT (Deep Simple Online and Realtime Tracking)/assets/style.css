@@ -1,0 +1,323 @@
+/* Shared stylesheet for DeepSORT lessons + reference docs. Tufte-ish: serif body, generous
+   margins, sidenotes, minimal chrome, prints cleanly. */
+
+:root {
+  --bg: #fdfcfa;
+  --ink: #1a1a17;
+  --ink-soft: #4a473f;
+  --rule: #d9d3c4;
+  --accent: #8a4b2e;
+  --accent-soft: #f3e6da;
+  --code-bg: #f2efe6;
+  --before: #f7ece8;
+  --before-ink: #7a2f1f;
+  --after: #eaf1ea;
+  --after-ink: #2f5c3a;
+  --track-b: #2f6690;
+  --track-b-soft: #dce9f1;
+  --max-w: 760px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --mono: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16150f;
+    --ink: #e9e5d8;
+    --ink-soft: #b5b0a0;
+    --rule: #3a382e;
+    --accent: #e0946a;
+    --accent-soft: #2a231c;
+    --code-bg: #221f18;
+    --before: #2a1a16;
+    --before-ink: #e0a48f;
+    --after: #17241a;
+    --after-ink: #9bd0a8;
+    --track-b: #7fb2d9;
+    --track-b-soft: #1b2a33;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.6;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 4rem 1.5rem 6rem;
+}
+
+h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+h1 { font-size: 2rem; margin: 0 0 0.3rem; }
+h2 { font-size: 1.35rem; margin: 2.6rem 0 0.8rem; border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; color: var(--ink-soft); }
+
+.kicker {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+
+.subtitle { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 2.2rem; }
+
+p { margin: 0 0 1.1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.4rem; }
+li { margin-bottom: 0.35rem; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  background: var(--code-bg);
+  padding: 1rem 1.1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+  margin: 0 0 1.3rem;
+}
+pre code { background: none; padding: 0; }
+
+blockquote {
+  margin: 0 0 1.1rem;
+  padding-left: 1rem;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-soft);
+}
+
+/* Sidenote-style asides, falls back to a plain block on narrow viewports */
+.note {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.8rem 1rem;
+  border-radius: 0 6px 6px 0;
+  margin: 0 0 1.3rem;
+}
+
+/* Before/after contrast blocks, used to show SORT vs DeepSORT */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0 0 1.3rem; }
+@media (max-width: 620px) { .compare { grid-template-columns: 1fr; } }
+.compare > div { padding: 0.9rem 1rem; border-radius: 6px; }
+.compare .before { background: var(--before); color: var(--before-ink); }
+.compare .after { background: var(--after); color: var(--after-ink); }
+.compare h4 { margin: 0 0 0.5rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.compare p, .compare ul { margin: 0; font-size: 0.92rem; }
+.compare ul { padding-left: 1.1rem; }
+
+table { border-collapse: collapse; width: 100%; margin: 0 0 1.3rem; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+
+.win {
+  margin: 2rem 0 0;
+  padding: 1.1rem 1.2rem;
+  background: var(--code-bg);
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+}
+.win .kicker { margin-bottom: 0.4rem; }
+
+.source {
+  margin: 1.6rem 0 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.ask-agent {
+  margin: 2.4rem 0 0;
+  padding-top: 1.2rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+nav.crumbs {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-bottom: 2rem;
+}
+nav.crumbs a { color: var(--ink-soft); }
+
+.quiz {
+  margin: 0 0 1.3rem;
+  padding: 1rem 1.1rem;
+  background: var(--code-bg);
+  border-radius: 6px;
+}
+.quiz p.q { font-weight: 600; margin-bottom: 0.7rem; }
+.quiz .options { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz button.opt {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.quiz button.opt:hover { border-color: var(--accent); }
+.quiz button.opt.correct { background: var(--after); border-color: var(--after-ink); color: var(--after-ink); }
+.quiz button.opt.wrong { background: var(--before); border-color: var(--before-ink); color: var(--before-ink); }
+.quiz .feedback { margin-top: 0.6rem; font-size: 0.88rem; min-height: 1.2em; }
+
+/* Reusable animated step-through diagrams (see assets/step-player.js).
+   A lesson builds its own SVG with node/edge ids, then calls createStepPlayer()
+   with a list of {label, caption, render} steps that toggle these classes. */
+
+.viz {
+  margin: 0 0 1.3rem;
+  padding: 1.2rem 1.2rem 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.viz svg { width: 100%; height: auto; display: block; }
+
+.viz-caption {
+  min-height: 2.6em;
+  margin-top: 0.7rem;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.step-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.step-btn {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.step-btn:hover:not(:disabled) { border-color: var(--accent); }
+.step-btn:disabled { opacity: 0.4; cursor: default; }
+.step-btn.step-play { color: var(--accent); border-color: var(--accent); }
+
+.step-label {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-right: auto;
+}
+
+.step-dots { display: flex; gap: 0.35rem; }
+.step-dot {
+  width: 9px; height: 9px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--bg); cursor: pointer;
+}
+.step-dot.active { background: var(--accent); border-color: var(--accent); }
+
+/* Node / edge primitives for track-vs-detection diagrams */
+.viz-node circle, .viz-node rect {
+  fill: var(--bg);
+  stroke: var(--rule);
+  stroke-width: 2;
+  transition: fill 0.4s ease, stroke 0.4s ease, opacity 0.4s ease;
+}
+.viz-node text { fill: var(--ink); font-family: var(--mono); }
+.viz-node .sub { fill: var(--ink-soft); font-size: 0.62em; }
+.viz-node.dim { opacity: 0.35; }
+
+.viz-node.active circle, .viz-node.active rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+  animation: viz-pulse 1.1s ease-in-out infinite;
+}
+.viz-node.matched circle, .viz-node.matched rect {
+  fill: var(--after);
+  stroke: var(--after-ink);
+}
+.viz-node.nomatch circle, .viz-node.nomatch rect {
+  stroke: var(--before-ink);
+  stroke-dasharray: 4 3;
+}
+.viz-node.deleted circle, .viz-node.deleted rect {
+  opacity: 0.3;
+  stroke: var(--before-ink);
+  stroke-dasharray: 3 3;
+}
+
+.viz-edge {
+  fill: none;
+  stroke: var(--after-ink);
+  stroke-width: 2.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: stroke-dashoffset 0.7s ease, opacity 0.2s ease;
+}
+.viz-edge.drawn { opacity: 1; stroke-dashoffset: 0; }
+
+/* Scatter-point primitives for embedding-space diagrams (two labeled clusters + one
+   "new point" probe, e.g. appearance-descriptor gallery matching). */
+.viz-dot {
+  transition: fill 0.5s ease, opacity 0.5s ease, r 0.4s ease;
+}
+.viz-dot.a { fill: var(--accent); }
+.viz-dot.b { fill: var(--track-b); }
+.viz-dot.new { fill: var(--after-ink); stroke: var(--after-ink); stroke-width: 2; }
+.viz-dot.hidden { opacity: 0; }
+.viz-dot.ghost { opacity: 0.15; }
+.viz-line {
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: stroke-dashoffset 0.6s ease, opacity 0.2s ease;
+}
+.viz-line.drawn { opacity: 1; stroke-dashoffset: 0; }
+.viz-line.win { stroke: var(--after-ink); }
+.viz-line.lose { stroke: var(--before-ink); stroke-dasharray: 3 2; }
+
+@keyframes viz-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 5px var(--accent)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-node.active circle, .viz-node.active rect { animation: none; }
+  .viz-edge { transition: opacity 0.2s ease; }
+}
+
+@media print {
+  body { max-width: none; padding: 0.5in; font-size: 12pt; }
+  a { color: inherit; text-decoration: underline; }
+  .ask-agent, nav.crumbs { display: none; }
+}

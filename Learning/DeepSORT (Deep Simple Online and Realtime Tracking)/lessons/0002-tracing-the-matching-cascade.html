@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0002 — Tracing the Matching Cascade</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/step-player.js"></script>
+</head>
+<body>
+
+<nav class="crumbs"><a href="../MISSION.md">Mission</a> · <a href="0001-what-deepsort-adds-to-sort.html">Lesson 0001</a> · Lesson 0002 · <a href="0003-the-appearance-descriptor.html">Lesson 0003</a> · <a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference: glossary</a></nav>
+
+<div class="kicker">Lesson 0002 · DeepSORT</div>
+<h1>Tracing the Matching Cascade</h1>
+<p class="subtitle">One worked frame, by hand — why age order changes the outcome, and what happens to the
+leftovers.</p>
+
+<h2>The setup</h2>
+<p>
+One frame. Four tracks already exist, each carrying a <code>time_since_update</code> counter from before this
+frame's matching runs (see the <a href="../reference/0002-kalman-hungarian-mahalanobis.html">Kalman primer</a> —
+this is the same counter that keeps climbing every frame a track goes unmatched).
+</p>
+<table>
+<tr><th>Track</th><th>time_since_update</th><th>State</th></tr>
+<tr><td>A</td><td>1</td><td>Confirmed</td></tr>
+<tr><td>B</td><td>1</td><td>Confirmed</td></tr>
+<tr><td>C</td><td>3</td><td>Confirmed (missed 2 frames — maybe occluded)</td></tr>
+<tr><td>D</td><td>1</td><td><strong>Tentative</strong> (brand new last frame)</td></tr>
+</table>
+<p>Three detections arrive this frame: <strong>1</strong>, <strong>2</strong>, <strong>3</strong>.</p>
+
+<div class="note">
+Reminder from Lesson 0001: a Tentative track (D) gets <strong>no benefit of the doubt</strong>. One missed
+match and it's deleted outright — it doesn't get to accumulate <code>time_since_update</code> like a Confirmed
+track can.
+</div>
+
+<h2>Watch it happen</h2>
+<p>Same scenario as the table above, animated level by level. Step through with the controls, or hit Play.</p>
+
+<div class="viz" id="cascadeViz">
+<svg viewBox="0 0 650 300" xmlns="http://www.w3.org/2000/svg">
+  <text x="325" y="22" text-anchor="middle" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--accent)" id="levelBadge">Before matching</text>
+
+  <text x="90" y="248" text-anchor="middle" font-size="11" fill="var(--ink-soft)">tracks</text>
+  <text x="560" y="248" text-anchor="middle" font-size="11" fill="var(--ink-soft)">detections</text>
+
+  <g class="viz-node" id="nodeA">
+    <circle cx="90" cy="50" r="26"/>
+    <text x="90" y="55" text-anchor="middle" font-size="16">A</text>
+    <text class="sub" x="90" y="90" text-anchor="middle">t=1</text>
+  </g>
+  <g class="viz-node" id="nodeB">
+    <circle cx="90" cy="120" r="26"/>
+    <text x="90" y="125" text-anchor="middle" font-size="16">B</text>
+    <text class="sub" x="90" y="160" text-anchor="middle">t=1</text>
+  </g>
+  <g class="viz-node" id="nodeC">
+    <circle cx="90" cy="190" r="26"/>
+    <text x="90" y="195" text-anchor="middle" font-size="16">C</text>
+    <text class="sub" x="90" y="230" text-anchor="middle">t=3</text>
+  </g>
+  <g class="viz-node" id="nodeD">
+    <circle cx="90" cy="260" r="26"/>
+    <text x="90" y="265" text-anchor="middle" font-size="16">D</text>
+    <text class="sub" x="90" y="300" text-anchor="middle">t=1 · tentative</text>
+  </g>
+
+  <g class="viz-node" id="nodeDet1">
+    <rect x="540" y="60" width="40" height="40" rx="7"/>
+    <text x="560" y="86" text-anchor="middle" font-size="16">1</text>
+  </g>
+  <g class="viz-node" id="nodeDet2">
+    <rect x="540" y="135" width="40" height="40" rx="7"/>
+    <text x="560" y="161" text-anchor="middle" font-size="16">2</text>
+  </g>
+  <g class="viz-node" id="nodeDet3">
+    <rect x="540" y="210" width="40" height="40" rx="7"/>
+    <text x="560" y="236" text-anchor="middle" font-size="16">3</text>
+  </g>
+
+  <line class="viz-edge" id="edgeA1" pathLength="1" x1="118" y1="52" x2="538" y2="78"/>
+  <line class="viz-edge" id="edgeB2" pathLength="1" x1="118" y1="122" x2="538" y2="153"/>
+  <line class="viz-edge" id="edgeC3" pathLength="1" x1="118" y1="192" x2="538" y2="228"/>
+</svg>
+<div class="viz-caption"></div>
+</div>
+
+<h2>Running the cascade</h2>
+<p>
+Per <a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference 0001</a>'s algorithm: loop cascade
+levels <code>n = 1, 2, 3, …</code>, and at each level, run Hungarian assignment (gated by Mahalanobis + cosine
+distance) using <strong>only</strong> the tracks whose <code>time_since_update == n</code>, against whatever
+detections are still unmatched.
+</p>
+
+<h3>Level n = 1</h3>
+<p>Tracks with <code>time_since_update == 1</code>: <strong>A, B, D</strong>. Detections available: 1, 2, 3.</p>
+<p>
+Gated cost matrix comes back favoring A↔1 and B↔2 (both pass Mahalanobis + cosine gates with low cost). D has no
+detection close enough in appearance to pass gating — say D is a false-positive detection from last frame with
+nothing similar-looking nearby now.
+</p>
+<p><strong>Result:</strong> matched = {A↔1, B↔2}. Unmatched detections remaining: {3}. Unmatched at this level:
+{D}.</p>
+
+<h3>Level n = 2</h3>
+<p>Tracks with <code>time_since_update == 2</code>: none exist this frame. Level skipped — <code>min_cost_matching</code>
+is never even called for an empty track set.</p>
+
+<h3>Level n = 3</h3>
+<p>Tracks with <code>time_since_update == 3</code>: <strong>C</strong>. Detection still unmatched: {3}.</p>
+<p>
+C's Kalman covariance has grown over its 3 missed frames (predict-without-correct, every frame, per the
+<a href="../reference/0002-kalman-hungarian-mahalanobis.html">Kalman primer</a>) — wider search area, but
+detection 3 still falls inside the gate. C↔3 passes.
+</p>
+<p><strong>Result:</strong> matched = {C↔3}. No detections left.</p>
+
+<h3>Cascade ends</h3>
+<p>
+No unmatched detections remain, so the loop exits early (it would otherwise continue up to
+<code>max_age</code>). Accumulated matches: <strong>{A↔1, B↔2, C↔3}</strong>. Track D was never matched at any
+level.
+</p>
+
+<h3>The IOU fallback pass</h3>
+<p>
+One thing left: tracks that are Tentative, or that were age-1 and still unmatched, get one more shot — a plain
+IOU-only match (exactly SORT's rule) against whatever detections are <em>still</em> unmatched after the cascade.
+Here, there are none. D gets nothing to match against, misses its one allowed frame as a Tentative track, and is
+deleted.
+</p>
+
+<div class="win">
+<div class="kicker">What the trace shows</div>
+<p>
+Two things a flat, non-cascaded match would <em>not</em> reproduce: (1) A and B — freshly confirmed, tightly
+gated — got first pick, so an accidental close match between, say, C's stale prediction and detection 1 never
+had the chance to steal it away. (2) C wasn't abandoned for being old — it still got matched, just after the
+more-trusted tracks had first pick. Age deprioritizes, it doesn't disqualify.
+</p>
+</div>
+
+<h2>Check yourself — reproduce the trace</h2>
+<div class="quiz" data-q="1">
+<p class="q">At cascade level n = 2, why does no assignment run?</p>
+<div class="options">
+<button class="opt" data-correct="true">No track has that age</button>
+<button class="opt">All detections already matched</button>
+<button class="opt">Mahalanobis gate rejects it</button>
+<button class="opt">Cosine distance too high</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="2">
+<p class="q">Why does track C still get matched despite being oldest?</p>
+<div class="options">
+<button class="opt" data-correct="true">Cascade deprioritizes, not excludes</button>
+<button class="opt">Hungarian algorithm ignores track age</button>
+<button class="opt">Mahalanobis gate favors older tracks</button>
+<button class="opt">IOU fallback runs before cascade</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="3">
+<p class="q">Why is track D deleted rather than aged like C was?</p>
+<div class="options">
+<button class="opt" data-correct="true">Tentative tracks get zero tolerance</button>
+<button class="opt">D's Kalman covariance grew too large</button>
+<button class="opt">D failed the cosine distance gate</button>
+<button class="opt">D exceeded the max_age threshold</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="4">
+<p class="q">What determines which tracks enter a given cascade level?</p>
+<div class="options">
+<button class="opt" data-correct="true">time_since_update equals the level</button>
+<button class="opt">hit_streak equals the level</button>
+<button class="opt">Track was created at that frame</button>
+<button class="opt">Track's cosine distance ranking</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="win">
+<div class="kicker">Today's win</div>
+<p>
+You've now traced one full cascade by hand — level-by-level track filtering, gated Hungarian assignment per
+level, and the final IOU fallback for tracks that never got picked up. That's the "reproduce it without looking
+it up" bar from <code>MISSION.md</code>. Next natural step: either the appearance descriptor itself (what CNN,
+what the embedding actually looks like, how the gallery <code>R<sub>k</sub></code> is maintained) or start
+sketching the <code>DeepSORTTracker</code> class skeleton against <code>BaseTracker</code> — your call.
+</p>
+</div>
+
+<div class="source">
+<strong>Primary source for this lesson:</strong> Wojke, N., Bewley, A., &amp; Paulus, D. (2017),
+<a href="https://arxiv.org/abs/1703.07402">arXiv:1703.07402</a>, Algorithm 1 (Matching Cascade). For the real
+control flow this trace is based on, read
+<a href="https://github.com/nwojke/deep_sort/blob/master/deep_sort/linear_assignment.py">
+<code>deep_sort/linear_assignment.py</code></a> directly — look for <code>matching_cascade()</code> (the outer
+age loop), <code>min_cost_matching()</code> (one Hungarian call per level), and <code>gate_cost_matrix()</code>
+(the Mahalanobis gate, with a 2-DOF χ² threshold of 5.9915 when gating position only, vs the 4-DOF 9.4877 from
+<a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference 0001</a> when gating the full state).
+</div>
+
+<p class="ask-agent">If the level-2-gets-skipped step or the D-gets-deleted step didn't feel obvious, say which
+one — worth another worked example with different numbers before moving on.</p>
+
+<script>
+(function () {
+  function setNode(id, cls) {
+    document.getElementById(id).setAttribute('class', 'viz-node ' + cls.join(' '));
+  }
+  function setEdge(id, drawn) {
+    document.getElementById(id).setAttribute('class', 'viz-edge' + (drawn ? ' drawn' : ''));
+  }
+  var levelBadge = document.getElementById('levelBadge');
+
+  var steps = [
+    {
+      label: 'Start',
+      caption: '4 tracks carry time_since_update from before this frame. 3 new detections just arrived.',
+      render: function () {
+        setNode('nodeA', []); setNode('nodeB', []); setNode('nodeC', []); setNode('nodeD', []);
+        setNode('nodeDet1', []); setNode('nodeDet2', []); setNode('nodeDet3', []);
+        setEdge('edgeA1', false); setEdge('edgeB2', false); setEdge('edgeC3', false);
+        levelBadge.textContent = 'Before matching';
+      }
+    },
+    {
+      label: 'Level n=1 — gate + assign',
+      caption: 'Tracks with time_since_update == 1 — A, B, D — compete first, gated by Mahalanobis + cosine distance, against all 3 detections.',
+      render: function () {
+        setNode('nodeA', ['active']); setNode('nodeB', ['active']); setNode('nodeD', ['active']); setNode('nodeC', ['dim']);
+        setNode('nodeDet1', []); setNode('nodeDet2', []); setNode('nodeDet3', []);
+        setEdge('edgeA1', false); setEdge('edgeB2', false); setEdge('edgeC3', false);
+        levelBadge.textContent = 'Cascade level: n = 1';
+      }
+    },
+    {
+      label: 'Level n=1 — result',
+      caption: 'A↔1 and B↔2 pass gating. D has nothing close enough in appearance — no match at this level.',
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['nomatch']); setNode('nodeC', ['dim']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', []);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', false);
+        levelBadge.textContent = 'Cascade level: n = 1 — matched';
+      }
+    },
+    {
+      label: 'Level n=2 — skipped',
+      caption: 'No track has time_since_update == 2. min_cost_matching never even runs for this level.',
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['nomatch']); setNode('nodeC', ['dim']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', []);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', false);
+        levelBadge.textContent = 'Cascade level: n = 2 — no tracks at this age, skipped';
+      }
+    },
+    {
+      label: 'Level n=3 — gate + assign',
+      caption: "Only C remains. Its covariance has grown over 3 missed frames — wider gate — but detection 3 still falls inside it.",
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['nomatch']); setNode('nodeC', ['active']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', ['active']);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', false);
+        levelBadge.textContent = 'Cascade level: n = 3';
+      }
+    },
+    {
+      label: 'Level n=3 — result',
+      caption: 'C↔3 matches. No detections remain unmatched — the cascade loop exits early.',
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['nomatch']); setNode('nodeC', ['matched']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', ['matched']);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', true);
+        levelBadge.textContent = 'Cascade level: n = 3 — matched, cascade ends';
+      }
+    },
+    {
+      label: 'IOU fallback pass',
+      caption: 'D (Tentative) gets one last IOU-only pass against leftover detections. None remain — nothing to match.',
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['active']); setNode('nodeC', ['matched']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', ['matched']);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', true);
+        levelBadge.textContent = 'IOU fallback pass — leftover detections: none';
+      }
+    },
+    {
+      label: 'Final',
+      caption: 'Tentative + one miss = deleted immediately. A, B, C carry {A↔1, B↔2, C↔3} into the next frame.',
+      render: function () {
+        setNode('nodeA', ['matched']); setNode('nodeB', ['matched']); setNode('nodeD', ['deleted']); setNode('nodeC', ['matched']);
+        setNode('nodeDet1', ['matched']); setNode('nodeDet2', ['matched']); setNode('nodeDet3', ['matched']);
+        setEdge('edgeA1', true); setEdge('edgeB2', true); setEdge('edgeC3', true);
+        levelBadge.textContent = 'Final: {A↔1, B↔2, C↔3} carried forward; D deleted';
+      }
+    }
+  ];
+
+  createStepPlayer(document.getElementById('cascadeViz'), steps, { interval: 1900 });
+})();
+</script>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answered = false;
+  quiz.querySelectorAll('button.opt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var correct = btn.getAttribute('data-correct') === 'true';
+      quiz.querySelectorAll('button.opt').forEach(function (b) {
+        if (b.getAttribute('data-correct') === 'true') b.classList.add('correct');
+        else if (b === btn) b.classList.add('wrong');
+      });
+      quiz.querySelector('.feedback').textContent = correct
+        ? 'Correct.'
+        : 'Not quite — correct answer highlighted above.';
+    });
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Kalman Filter, Hungarian Algorithm, Mahalanobis Distance</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<nav class="crumbs"><a href="../MISSION.md">Mission</a> · Reference 0002 · <a href="../lessons/0001-what-deepsort-adds-to-sort.html">Lesson 0001: What DeepSORT Adds to SORT</a> · <a href="0001-sort-vs-deepsort-glossary.html">Reference 0001: SORT vs DeepSORT glossary</a></nav>
+
+<div class="kicker">Reference · Math primer</div>
+<h1>Kalman Filter, Hungarian Algorithm, Mahalanobis Distance</h1>
+<p class="subtitle">The three mechanisms underneath both <code>SORTTracker</code> and DeepSORT — what each one
+actually computes, and where to find it in this codebase's <code>KalmanBox</code>.</p>
+
+<h2>Kalman filter</h2>
+<p>
+A recursive estimator: keeps a running belief about an object's state (position, velocity) and its own
+uncertainty about that belief, and updates both every frame in two steps.
+</p>
+<table>
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td><code>x</code></td><td>State vector — the thing being estimated.</td></tr>
+<tr><td><code>P</code></td><td>State covariance — the filter's own uncertainty about <code>x</code>.</td></tr>
+<tr><td><code>F</code></td><td>Transition matrix — how state evolves one frame to the next, absent new
+information.</td></tr>
+<tr><td><code>Q</code></td><td>Process noise — how much unmodeled randomness enters the system per step (e.g.
+an object can accelerate, and the constant-velocity model doesn't know that).</td></tr>
+<tr><td><code>z</code></td><td>Measurement — the new detection box.</td></tr>
+<tr><td><code>H</code></td><td>Measurement matrix — maps state space down to measurement space (e.g. drops the
+velocity components, since a detection has no velocity reading).</td></tr>
+<tr><td><code>R</code></td><td>Measurement noise — how much to distrust the detector itself.</td></tr>
+<tr><td><code>K</code></td><td>Kalman gain — computed each step; decides how much to trust the new measurement
+versus the prior prediction.</td></tr>
+</table>
+
+<pre><code>Predict:
+  x' = F x                (advance state by the motion model)
+  P' = F P Fᵀ + Q         (uncertainty grows — motion model isn't perfect)
+
+Correct (once a detection arrives):
+  y  = z − H x'            (innovation: measurement minus predicted measurement)
+  S  = H P' Hᵀ + R         (innovation covariance)
+  K  = P' Hᵀ S⁻¹           (Kalman gain — how much to trust the measurement)
+  x  = x' + K y            (blend prediction and measurement)
+  P  = (I − K H) P'        (uncertainty shrinks — new information arrived)
+</code></pre>
+
+<div class="note">
+Intuition on <code>K</code>: if <code>R</code> (measurement noise) is large relative to <code>P'</code> (state
+uncertainty), <code>K</code> is small — the filter barely moves toward the new detection, trusting its own
+prediction more. If <code>P'</code> is large relative to <code>R</code> — a track that hasn't been seen in a
+while, uncertainty ballooned — <code>K</code> is large, and the filter snaps close to the new measurement.
+</div>
+
+<h3>In this codebase</h3>
+<pre><code># deepvision/deepvision/object_entity/kalman/kalman_box.py:28
+self.kf: KalmanFilter = KalmanFilter(dim_x=7, dim_z=4)
+
+# state x (7-dim): [cx, cy, aspect_ratio, height, vx, vy, v_aspect]
+#   — no v_height term; height changes are treated as noise, not modeled motion
+
+# kalman_box.py:35 — F, constant-velocity transition matrix:
+#   position_next = position + velocity  (each of cx, cy, aspect gets a velocity term;
+#   height has none, consistent with the 7-dim state above)
+
+# kalman_box.py:44 — H, measurement matrix:
+#   maps the 7-dim state down to the 4-dim measurement [cx, cy, aspect_ratio, height]
+#   (detections have no velocity reading, so velocity rows are dropped)
+
+# kalman_box.py:51-57 — R, P, Q initialization:
+#   kf.R[2:,2:] *= 10.       → distrust aspect-ratio / height measurements more than position
+#   kf.P[4:,4:] *= 1000.     → huge initial uncertainty on velocity (unobservable at frame 1)
+#   kf.Q[4:,4:] *= 0.01      → assume velocity changes slowly frame to frame
+</code></pre>
+<p>
+<code>predict()</code> (called every frame, even without a match) runs the top half of the algorithm above.
+<code>update()</code> (called only on a matched detection) runs the bottom half. An unmatched track still gets
+<code>predict()</code>-ed — its <code>P</code> keeps growing every frame it goes unseen, which is exactly the
+signal Mahalanobis gating (below) would use, and exactly why a long-unseen track's position estimate should be
+trusted less.
+</p>
+
+<h2>Hungarian algorithm (linear assignment)</h2>
+<p>
+The assignment problem: given an <em>N</em>×<em>M</em> cost matrix (rows = tracks, columns = detections), find
+the one-to-one pairing that minimizes total cost — <em>optimal</em>, not greedy. A greedy "take the best match
+first" approach can lock in a locally-good pair that blocks a much better global pairing later; the Hungarian
+algorithm (Kuhn, 1955) solves the whole matrix at once in polynomial time (O(n³)).
+</p>
+<div class="note">
+Worked intuition: tracks A, B and detections 1, 2. Cost(A,1)=1, Cost(A,2)=2, Cost(B,1)=2, Cost(B,2)=5. Greedy
+picks A↔1 first (cheapest cell, cost 1), forcing B↔2 (cost 5). Total: 6. Optimal is A↔2, B↔1: cost 2+2=4. The
+greedy pick looked best locally and was wrong globally — this is precisely the failure mode the algorithm exists
+to avoid.
+</div>
+<pre><code># deepvision/deepvision/tracker/sort_tracker.py:156
+matched_indices = np.transpose(linear_sum_assignment(-iou_matrix))
+#                                                       ^ negated: scipy minimizes cost,
+#                                                         but higher IOU should win, so
+#                                                         cost = −IOU
+</code></pre>
+<p>
+<code>SORTTracker</code> calls this once per frame, across every track and every detection simultaneously.
+DeepSORT's matching cascade (see <a href="0001-sort-vs-deepsort-glossary.html">Reference 0001</a>) calls it
+repeatedly — once per track-age bucket — instead of once globally.
+</p>
+
+<h2>Mahalanobis distance</h2>
+<p>
+A distance from a point to a distribution, measured in units of that distribution's own standard deviation along
+each direction — not raw Euclidean distance, which treats every direction as equally uncertain.
+</p>
+<pre><code>d² = (x − μ)ᵀ Σ⁻¹ (x − μ)
+
+  x : the point being measured (a detection, in tracking-space coordinates)
+  μ : the distribution's mean (a track's predicted state)
+  Σ : the distribution's covariance (the Kalman filter's predicted P, projected into
+      measurement space — this is exactly S from the Kalman equations above)
+</code></pre>
+<p>
+Why Σ⁻¹ matters: a Kalman track's uncertainty is <em>not a circle</em>. A fast-moving object has wide uncertainty
+along its direction of travel (small errors in velocity estimate compound quickly) and tight uncertainty
+perpendicular to it. Squaring the raw offset and dividing by Euclidean distance ignores this shape entirely —
+Mahalanobis distance stretches the metric to match it: the same physical pixel offset counts as "close" along the
+uncertain axis, "far" along the confident one.
+</p>
+<div class="compare">
+<div class="before">
+<h4>Raw IOU threshold (SORT)</h4>
+<p>One flat cutoff, applied identically to a track seen 1 frame ago and a track seen 10 frames ago — even though
+the second one's position estimate is far less trustworthy.</p>
+</div>
+<div class="after">
+<h4>Mahalanobis gate (DeepSORT)</h4>
+<p>Threshold is on <em>standard deviations</em>, not pixels — a track that's been unseen longer has larger <code>P</code>
+(hence larger <code>S</code>), so the same pixel offset produces a smaller Mahalanobis distance and survives
+gating. The metric adapts to how much the filter currently trusts itself.</p>
+</div>
+</div>
+<p>
+Not currently used in <code>SORTTracker</code> — only IOU. But the plumbing already exists:
+<code>kalman_box.py:72</code> explicitly excludes <code>"mahalanobis"</code> from the set of keys saved from
+<code>filterpy.common.Saver</code>, meaning the attribute is present on <code>self.kf</code> (filterpy computes
+it internally for its own likelihood calculations) and simply unused downstream. Wiring gating into
+<code>SORTTracker</code>'s matching step would tap directly into that.
+</p>
+
+<div class="note">
+Read together, these three: <strong>Kalman</strong> produces a state estimate <em>and</em> a covariance every
+frame; <strong>Mahalanobis</strong> turns that covariance into a distance-based gate for candidate matches;
+<strong>Hungarian</strong> takes whatever candidates survive gating and finds the globally optimal pairing. SORT
+uses only the first and third — DeepSORT's gating step is what's missing in between.
+</div>
+
+</body>
+</html>

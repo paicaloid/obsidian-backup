@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0001 — What DeepSORT Adds to SORT</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<nav class="crumbs"><a href="../MISSION.md">Mission</a> · Lesson 0001 · <a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference: SORT vs DeepSORT glossary</a> · <a href="../reference/0002-kalman-hungarian-mahalanobis.html">Reference: Kalman/Hungarian/Mahalanobis primer</a></nav>
+
+<div class="kicker">Lesson 0001 · DeepSORT</div>
+<h1>What DeepSORT Adds to SORT</h1>
+<p class="subtitle">Four specific additions, each fixing one thing <code>SORTTracker</code> cannot do.</p>
+
+<h2>The failure mode, in your own code</h2>
+<p>
+<code>SORTTracker.update()</code> does exactly three things every frame: predict where existing tracks moved to
+(<code>_pre_estimate_kalman_boxes</code>), match those predictions against this frame's detections by
+Intersection-over-Union (<code>_associate_detections_to_kalman_boxes</code>), and age out anything unmatched for
+too long (<code>_remove_dead_kalman_boxes</code>, gated by <code>max_age</code>).
+</p>
+<pre><code>@jit
+def iou(bb_test, bb_gt):
+    """Computes IOU between two bboxes in the form [xmin, ymin, xmax, ymax, *_]"""
+    ...
+
+# deepvision/deepvision/tracker/sort_tracker.py:18-32
+</code></pre>
+<p>
+That IOU matrix is the <em>entire</em> notion of identity in SORT. A track is "the same object" purely because its
+predicted box overlaps a new detection's box. There is nothing in <code>KalmanBox</code> or <code>SORTTracker</code>
+that remembers what an object <em>looks like</em>.
+</p>
+<p>
+Walk through what happens when a tracked person is occluded for a couple of seconds — behind a pillar, behind
+another person, out of frame briefly:
+</p>
+<ol>
+<li>No detection matches that Kalman box. It becomes an <code>unmatched_kalman_box</code> every frame.</li>
+<li><code>time_since_update</code> climbs. Once it exceeds <code>max_age</code> (15 frames by default in this
+codebase — <code>DEFAULT_TRACKER_CONFIG</code> in
+<a href="file:///Users/pai/ws/real-time-core-pipeline/core/object_tracker/object_tracker.py">object_tracker.py</a>),
+<code>_remove_dead_kalman_boxes</code> deletes it outright.</li>
+<li>When the person reappears, there is no old track left to match against. A brand-new <code>KalmanBox</code> is
+created with a brand-new <code>current_id</code> in <code>_initialize_new_kalman_boxes</code>.</li>
+</ol>
+<p>Same physical person, two different track IDs. This is an <strong>identity switch</strong>, and it is the
+central failure mode SORT accepts in exchange for being fast and simple.</p>
+
+<div class="note">
+<strong>Why this blocks the lineless counter mission.</strong> The current pipeline counts on a line-crossing
+event — a single instant where identity switches barely matter, because the count only needs the ID to be stable
+for the one frame it crosses. Lineless counting removes that anchor: correctness now depends on a track ID
+staying attached to one physical object for its <em>entire</em> visible duration, occlusions included. SORT's
+IOU-only matching was never designed to guarantee that.
+</div>
+
+<h2>The fix: DeepSORT's four additions</h2>
+<p>
+DeepSORT (Wojke, Bewley &amp; Paulus, 2017) keeps SORT's skeleton — Kalman filter, Hungarian assignment — and adds
+four things on top. Each one targets a specific gap above.
+</p>
+
+<h3>1. An appearance descriptor, so tracks remember what they look like</h3>
+<div class="compare">
+<div class="before">
+<h4>SORT</h4>
+<p>A <code>KalmanBox</code> stores only geometry: position, velocity, box size. Nothing visual.</p>
+</div>
+<div class="after">
+<h4>DeepSORT</h4>
+<p>Each confirmed detection is run through a small CNN, producing a 128-dim appearance vector <code>r</code>.
+Every track keeps a gallery <code>R<sub>k</sub></code> of its last 100 appearance vectors.</p>
+</div>
+</div>
+<p>
+This is the actual fix for the occlusion problem above: when the person reappears, DeepSORT does not need an
+overlapping box to recognize them — it can compare the new detection's appearance vector against the gallery of
+every track, including ones that have aged past what SORT would already have deleted.
+</p>
+
+<h3>2. Mahalanobis gating instead of an IOU threshold</h3>
+<div class="compare">
+<div class="before">
+<h4>SORT</h4>
+<p><code>iou_matrix[d_idx, kb_idx] &lt; self.iou_threshold</code> rejects a match. A fixed geometric overlap
+cutoff, blind to how confident the Kalman filter actually is about its own prediction.</p>
+</div>
+<div class="after">
+<h4>DeepSORT</h4>
+<p>Uses the Kalman filter's own predicted covariance to compute a Mahalanobis distance between a detection and a
+track's predicted state, gated at the 95% confidence interval of a chi-squared distribution (threshold ≈ 9.49 for
+4 degrees of freedom).</p>
+</div>
+</div>
+<p>
+The insight: the Kalman filter already knows how uncertain it is (a track that hasn't been seen in a while has a
+wider covariance). Mahalanobis gating uses that uncertainty directly, instead of a single flat threshold applied
+uniformly to every track regardless of how reliable its prediction currently is.
+</p>
+
+<h3>3. A matching cascade instead of one global assignment</h3>
+<div class="compare">
+<div class="before">
+<h4>SORT</h4>
+<p><code>_associate_detections_to_kalman_boxes</code> runs <strong>one</strong> Hungarian assignment across every
+track and every detection at once, all treated equally regardless of track age.</p>
+</div>
+<div class="after">
+<h4>DeepSORT</h4>
+<p>Runs Hungarian assignment <strong>once per age bucket</strong>, starting with tracks matched most recently
+(<code>time_since_update = 1</code>) and working outward to tracks not seen in longer. Detections left over after
+all buckets are matched against unconfirmed / age-1 tracks by IOU, as a fallback.</p>
+</div>
+</div>
+<p>
+Why this matters: in one global assignment, a detection that's a mediocre match for a fresh track can still
+"steal" it away from a better long-lost track — because cost matrices don't know which match is more trustworthy.
+The cascade fixes this by giving recently-confirmed tracks first pick, on the reasoning that they're the ones the
+Kalman filter is currently most confident about.
+</p>
+
+<h3>4. A track lifecycle: tentative → confirmed → deleted</h3>
+<div class="compare">
+<div class="before">
+<h4>SORT</h4>
+<p><code>min_hits</code> gates whether a track's box is <em>returned</em> from <code>track_boxes</code>, but every
+track — hit once or a hundred times — competes equally for matches from frame one.</p>
+</div>
+<div class="after">
+<h4>DeepSORT</h4>
+<p>A new track starts <code>Tentative</code> and must match for <code>n_init</code> consecutive frames to become
+<code>Confirmed</code>. A tentative track that misses even once is deleted immediately (no benefit-of-the-doubt);
+a confirmed track survives up to <code>max_age</code> misses, same as SORT.</p>
+</div>
+</div>
+<p>
+This keeps noisy, one-frame-only detections from ever entering the appearance gallery or competing in the
+matching cascade — they're filtered before they can cause damage, rather than after.
+</p>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-q="1">
+<p class="q">What causes SORT to assign a new ID after occlusion?</p>
+<div class="options">
+<button class="opt" data-correct="true">No appearance memory kept</button>
+<button class="opt">Kalman filter predicts wrong</button>
+<button class="opt">Hungarian algorithm runs slow</button>
+<button class="opt">IOU threshold set high</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="2">
+<p class="q">Mahalanobis gating filters candidate matches using what?</p>
+<div class="options">
+<button class="opt" data-correct="true">Motion prediction uncertainty</button>
+<button class="opt">Bounding box color value</button>
+<button class="opt">Appearance embedding distance</button>
+<button class="opt">Detection confidence score</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="3">
+<p class="q">The matching cascade gives first pick of detections to which tracks?</p>
+<div class="options">
+<button class="opt" data-correct="true">Tracks matched most recently</button>
+<button class="opt">Tracks with highest confidence</button>
+<button class="opt">Tracks with largest bounding box</button>
+<button class="opt">Tracks holding the lowest ID</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="win">
+<div class="kicker">Today's win</div>
+<p>You can now point to the exact line in <code>sort_tracker.py</code> that causes an identity switch, and name
+the four DeepSORT mechanisms that fix it: appearance descriptor, Mahalanobis gating, matching cascade, and the
+tentative/confirmed track lifecycle. Next lesson goes one level deeper into the matching cascade's pseudocode —
+see the <a href="../reference/0001-sort-vs-deepsort-glossary.html">glossary + algorithm reference</a> in the
+meantime for the exact formulas.</p>
+</div>
+
+<div class="source">
+<strong>Primary source for this lesson:</strong> Wojke, N., Bewley, A., &amp; Paulus, D. (2017).
+<a href="https://arxiv.org/abs/1703.07402">Simple Online and Realtime Tracking with a Deep Association Metric</a>,
+arXiv:1703.07402 — Section 2 (Track Handling and State Estimation, Assignment Problem, Matching Cascade,
+Appearance Descriptor). Also useful: the reference implementation at
+<a href="https://github.com/nwojke/deep_sort">github.com/nwojke/deep_sort</a>, specifically
+<code>deep_sort/tracker.py</code> and <code>deep_sort/linear_assignment.py</code>.
+</div>
+
+<p class="ask-agent">Something above unclear, or want to push on an edge case (what happens with two visually
+identical objects, say)? Ask your agent — that's what it's there for. Say what's confusing and it'll adjust the
+next lesson.</p>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answered = false;
+  quiz.querySelectorAll('button.opt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var correct = btn.getAttribute('data-correct') === 'true';
+      quiz.querySelectorAll('button.opt').forEach(function (b) {
+        if (b.getAttribute('data-correct') === 'true') b.classList.add('correct');
+        else if (b === btn) b.classList.add('wrong');
+      });
+      quiz.querySelector('.feedback').textContent = correct
+        ? 'Correct.'
+        : 'Not quite — correct answer highlighted above.';
+    });
+  });
+});
+</script>
+
+</body>
+</html>

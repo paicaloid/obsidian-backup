@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — SORT vs DeepSORT Glossary &amp; Algorithm</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<nav class="crumbs"><a href="../MISSION.md">Mission</a> · Reference 0001 · <a href="../lessons/0001-what-deepsort-adds-to-sort.html">Lesson 0001: What DeepSORT Adds to SORT</a></nav>
+
+<div class="kicker">Reference · DeepSORT</div>
+<h1>SORT vs DeepSORT — Glossary &amp; Algorithm</h1>
+<p class="subtitle">Quick-lookup terms and the matching-cascade algorithm. Kept in sync with the codebase's
+<code>SORTTracker</code>; update this file, not the lesson, when terminology settles.</p>
+
+<h2>Glossary</h2>
+<table>
+<tr><th>Term</th><th>Meaning</th><th>Where it lives</th></tr>
+
+<tr><td><strong>Track</strong></td><td>One hypothesized object, carried across frames as an ID + state.</td>
+<td>SORT: <code>KalmanBox</code>. DeepSORT: <code>Track</code> object with an added appearance gallery.</td></tr>
+
+<tr><td><strong>Kalman filter</strong></td><td>Recursive motion predictor: predicts next-frame position from
+current velocity estimate, then corrects using the matched detection.</td>
+<td>Same role in both — DeepSORT uses a constant-velocity model over
+<code>(u, v, γ, h, ẋ, ẏ, γ̇, ḣ)</code> (center x/y, aspect ratio, height, and their derivatives).</td></tr>
+
+<tr><td><strong>Hungarian algorithm</strong> (linear assignment)</td><td>Solves the assignment problem: given a
+cost matrix, find the pairing that minimizes total cost. <code>scipy.optimize.linear_sum_assignment</code> in this
+codebase.</td><td>SORT: one global call. DeepSORT: one call <em>per cascade level</em>, plus one IOU-only call for
+leftovers.</td></tr>
+
+<tr><td><strong>IOU</strong> (Intersection-over-Union)</td><td>Overlap ratio of two boxes:
+<code>area(A∩B) / area(A∪B)</code>. Range [0, 1].</td><td>SORT: the only matching signal. DeepSORT: still used, but
+only as the fallback matcher for track age 1 / unconfirmed tracks.</td></tr>
+
+<tr><td><strong>Mahalanobis distance</strong></td><td>Distance between a detection and a track's predicted state,
+scaled by the Kalman filter's own predicted covariance — i.e. "how many standard deviations away, given how
+uncertain the filter currently is."</td><td>DeepSORT only. SORT has no motion-uncertainty-aware matching.</td></tr>
+
+<tr><td><strong>Gating</strong></td><td>Rejecting a candidate match outright if its distance exceeds a threshold,
+before optimization even runs — reduces the cost matrix's search space and blocks obviously-wrong pairings.</td>
+<td>SORT: IOU threshold gate (<code>iou_threshold</code>, e.g. 0.2–0.3). DeepSORT: Mahalanobis gate (χ² threshold
+≈ 9.49 at 95% CI, 4 DOF) <em>and</em> a cosine-distance gate, applied together.</td></tr>
+
+<tr><td><strong>Appearance descriptor</strong> (re-ID embedding)</td><td>A fixed-length vector (128-dim in the
+original DeepSORT) produced by a small CNN trained for person re-identification — encodes "what this crop looks
+like," not where it is. Paper's network: 2 conv layers + 6 residual blocks, 128-dim output, L2-normalized onto
+the unit hypersphere, trained offline on ~1.1M images of 1,261 identities — frozen at inference, never trained
+on your footage. See <a href="../lessons/0003-the-appearance-descriptor.html">Lesson 0003</a>.</td><td>DeepSORT
+only. This is the single addition that lets a track survive being deleted-and-recreated across an
+occlusion.</td></tr>
+
+<tr><td><strong>Cosine distance</strong></td><td><code>1 − cos(θ)</code> between two appearance vectors. Small =
+visually similar.</td><td>DeepSORT's appearance matching metric, used alongside Mahalanobis distance.</td></tr>
+
+<tr><td><strong>Gallery R<sub>k</sub></strong></td><td>The last <em>N</em> (100 in the paper) appearance vectors
+stored per track. Matching compares a new detection against the whole gallery, not just the most recent vector, so
+a track survives brief pose/lighting changes.</td><td>DeepSORT only.</td></tr>
+
+<tr><td><strong>Matching cascade</strong></td><td>Runs Hungarian assignment separately per "frames since last
+matched" bucket, most-recent first, instead of one global assignment across all tracks.</td><td>DeepSORT only —
+see algorithm below.</td></tr>
+
+<tr><td><strong>Track state: Tentative</strong></td><td>A brand-new track, not yet trusted. Deleted immediately on
+its first missed match.</td><td>DeepSORT only. SORT has no equivalent — every <code>KalmanBox</code> is
+equally eligible for matching from creation.</td></tr>
+
+<tr><td><strong>Track state: Confirmed</strong></td><td>Reached after <code>n_init</code> consecutive matched
+frames. Now tolerates misses up to <code>max_age</code>, same as SORT's aging rule.</td><td>DeepSORT only.</td></tr>
+
+<tr><td><strong>Track state: Deleted</strong></td><td>Removed from the track list — either a tentative track's
+first miss, or a confirmed track exceeding <code>max_age</code>.</td><td>Both, though SORT has no tentative-miss
+shortcut.</td></tr>
+
+<tr><td><code>n_init</code></td><td>Consecutive hits required before Tentative → Confirmed.</td><td>DeepSORT only
+— SORT's closest analogue is <code>min_hits</code>, but <code>min_hits</code> only gates whether a box is
+<em>returned</em>, not whether the track is eligible to keep matching.</td></tr>
+
+<tr><td><code>max_age</code></td><td>Frames a track may go unmatched before deletion.</td><td>Same name, same role,
+in both — <code>SORTTracker.max_age</code> ⟷ DeepSORT's <code>max_age</code>.</td></tr>
+
+<tr><td><code>hit_streak</code> / <code>time_since_update</code></td><td>Per-track counters: consecutive matched
+frames, and frames since last matched.</td><td>Same concept in both; DeepSORT's cascade orders directly by
+<code>time_since_update</code>.</td></tr>
+
+</table>
+
+<h2>Algorithm: the matching cascade</h2>
+<p>From Wojke, Bewley &amp; Paulus (2017), Section 2 / Algorithm 1, restated:</p>
+<pre><code>Input: Track indices T = {1, ..., N}, Detection indices D = {1, ..., M},
+       max_age
+
+1.  Compute cost matrix C = [c(i,j)] via the combined Mahalanobis + cosine
+    gated cost (see below), for all i in T, j in D.
+2.  Compute the gate matrix B = [b(i,j)] (1 if the pair passes BOTH the
+    Mahalanobis gate and the cosine-distance gate, else 0).
+3.  Initialize: matches = {}, unmatched_detections = D
+
+4.  for n = 1 .. max_age:                    # cascade level: age bucket
+5.      if unmatched_detections is empty: break
+6.      T_n = { i in T : time_since_update(i) == n }
+7.      [x_i,j] = min_cost_matching(C, T_n, unmatched_detections)  # Hungarian, gated by B
+8.      matches = matches ∪ { (i, j) : x_i,j == 1 }
+9.      unmatched_detections = unmatched_detections \ { j : (i,j) in matches }
+
+10. return matches, unmatched_detections, T \ { i : (i,j) in matches }
+</code></pre>
+<p>
+Leftover <code>unmatched_detections</code> after the cascade are matched against age-1 / unconfirmed tracks in one
+final IOU-only pass — this is SORT's exact matching rule, kept as-is for the case a track is too new to have a
+reliable appearance gallery yet.
+</p>
+
+<h3>Gating: Mahalanobis distance</h3>
+<pre><code>d(1)(i, j) = (d_j − y_i)ᵀ · S_i⁻¹ · (d_j − y_i)
+
+  d_j : detection j's bounding box, in the Kalman state's coordinate space
+  y_i : track i's predicted mean state
+  S_i : track i's predicted covariance
+
+Gate: accept pair (i, j) only if d(1)(i, j) ≤ t(1),  t(1) = 9.4877
+      (χ² 95% confidence interval, 4 degrees of freedom — full state:
+      x, y, aspect ratio, height)
+
+      Position-only variant (2 DOF: x, y only) uses t(1) = 5.9915 instead —
+      see gate_cost_matrix()'s only_position flag in the reference repo.
+</code></pre>
+
+<h3>Gating: cosine (appearance) distance</h3>
+<pre><code>d(2)(i, j) = min over r_k in R_i of ( 1 − r_jᵀ r_k )
+
+  R_i : track i's gallery of up to 100 past appearance vectors
+  r_j : detection j's appearance vector (from the CNN embedding)
+
+Gate: accept pair (i, j) only if d(2)(i, j) ≤ t(2)
+      (t(2) is a tuned hyperparameter, not derived analytically)
+</code></pre>
+
+<h3>Combined cost</h3>
+<pre><code>c(i, j) = λ · d(1)(i, j) + (1 − λ) · d(2)(i, j)
+
+  Both gates (Mahalanobis AND cosine) must pass for the pair to be
+  eligible at all — c(i,j) is only meaningful for pairs that pass both.
+  The paper uses λ = 0 in most experiments (appearance dominates),
+  since motion is a weak signal under camera motion / occlusion.
+</code></pre>
+
+<div class="note">
+This is a reference, not a tutorial — read <a href="../lessons/0001-what-deepsort-adds-to-sort.html">Lesson
+0001</a> first if the <em>why</em> behind any of this isn't clear yet.
+</div>
+
+</body>
+</html>

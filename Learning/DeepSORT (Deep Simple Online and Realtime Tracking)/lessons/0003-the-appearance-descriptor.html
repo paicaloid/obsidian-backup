@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0003 — The Appearance Descriptor</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/step-player.js"></script>
+</head>
+<body>
+
+<nav class="crumbs"><a href="../MISSION.md">Mission</a> · <a href="0001-what-deepsort-adds-to-sort.html">Lesson 0001</a> · <a href="0002-tracing-the-matching-cascade.html">Lesson 0002</a> · Lesson 0003 · <a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference: glossary</a></nav>
+
+<div class="kicker">Lesson 0003 · DeepSORT</div>
+<h1>The Appearance Descriptor: From Crop to Vector</h1>
+<p class="subtitle">What <code>r</code> actually is, why it lives on a unit hypersphere, and why matching checks
+a whole gallery instead of just the latest snapshot.</p>
+
+<h2>The gap Lesson 0002 left open</h2>
+<p>
+The cascade trace assumed <code>d(2)(i, j)</code>, the cosine-distance gate, just <em>worked</em> — that some
+number came back saying "close" or "far" between a track and a detection. This lesson is what's actually behind
+that number.
+</p>
+
+<h2>From pixels to a 128-dim vector</h2>
+<p>
+Every detection crop is run through a small convolutional network — <strong>2 convolutional layers followed by
+6 residual blocks</strong> — that outputs a single <strong>128-dimensional</strong> vector. That's it: no boxes,
+no positions, purely "what does this crop look like."
+</p>
+<div class="note">
+This network is trained <em>once, offline</em>, on a large-scale person re-identification dataset (~1.1 million
+images across 1,261 identities) — never on your footage, and not retrained at deploy time. At inference it's
+just a frozen forward pass. This is exactly why <code>MISSION.md</code> puts custom re-id training out of
+scope for now: the off-the-shelf network is the whole point, not a placeholder for one you'd train yourself.
+</div>
+
+<h2>Why project onto a unit hypersphere</h2>
+<p>
+The network's raw output gets L2-normalized — divided by its own length — before anything else happens. Once
+every vector has length 1, comparing two of them by dot product <em>is</em> comparing them by cosine similarity
+(⟨r<sub>i</sub>, r<sub>j</sub>⟩ = cos θ when both vectors have unit length). Cosine <em>distance</em> is then
+just <code>1 − cos θ</code>.
+</p>
+<p>
+Why bother: without normalization, a brighter or larger crop could produce a longer raw vector, and Euclidean
+distance would confuse "different magnitude" with "different identity." Projecting onto the unit sphere throws
+magnitude away entirely — only <em>direction</em> (what the crop looks like) remains comparable.
+</p>
+
+<h2>Watch it happen — matching against a gallery</h2>
+<p>
+Each track keeps a gallery of its last <strong>100</strong> appearance vectors, not just the newest one. Here's
+why that matters, traced through one match.
+</p>
+
+<div class="viz" id="galleryViz">
+<svg viewBox="0 0 500 460" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="250" cy="230" r="180" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
+  <text x="250" y="18" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--ink-soft)">unit hypersphere (2D stand-in for the real 128-dim one)</text>
+
+  <line class="viz-line" id="lineA1" pathLength="1" x1="175" y1="80" x2="86" y2="190"/>
+  <line class="viz-line" id="lineA2" pathLength="1" x1="175" y1="80" x2="95" y2="158"/>
+  <line class="viz-line" id="lineA3" pathLength="1" x1="175" y1="80" x2="108" y2="132"/>
+  <line class="viz-line" id="lineA4" pathLength="1" x1="175" y1="80" x2="128" y2="110"/>
+  <line class="viz-line" id="lineA5" pathLength="1" x1="175" y1="80" x2="155" y2="92"/>
+  <line class="viz-line" id="lineB" pathLength="1" x1="175" y1="80" x2="330" y2="392"/>
+
+  <circle class="viz-dot a hidden" id="dotA1" cx="86" cy="190" r="7"/>
+  <circle class="viz-dot a hidden" id="dotA2" cx="95" cy="158" r="7"/>
+  <circle class="viz-dot a hidden" id="dotA3" cx="108" cy="132" r="7"/>
+  <circle class="viz-dot a hidden" id="dotA4" cx="128" cy="110" r="7"/>
+  <circle class="viz-dot a hidden" id="dotA5" cx="155" cy="92" r="7"/>
+
+  <circle class="viz-dot b hidden" id="dotB1" cx="420" cy="310" r="7"/>
+  <circle class="viz-dot b hidden" id="dotB2" cx="405" cy="340" r="7"/>
+  <circle class="viz-dot b hidden" id="dotB3" cx="385" cy="362" r="7"/>
+  <circle class="viz-dot b hidden" id="dotB4" cx="360" cy="378" r="7"/>
+  <circle class="viz-dot b hidden" id="dotB5" cx="330" cy="392" r="7"/>
+
+  <circle class="viz-dot new hidden" id="dotNew" cx="175" cy="80" r="8"/>
+
+  <text x="60" y="215" font-family="var(--mono)" font-size="12" fill="var(--accent)">R_A (Track A)</text>
+  <text x="330" y="410" font-family="var(--mono)" font-size="12" fill="var(--track-b)">R_B (Track B)</text>
+  <text x="182" y="65" font-family="var(--mono)" font-size="12" fill="var(--ink-soft)" id="newLabel"></text>
+</svg>
+<div class="viz-caption"></div>
+</div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-q="1">
+<p class="q">Why are appearance embeddings projected onto a hypersphere?</p>
+<div class="options">
+<button class="opt" data-correct="true">So cosine distance works</button>
+<button class="opt">So embeddings load faster</button>
+<button class="opt">So Kalman filter converges</button>
+<button class="opt">So Hungarian assignment runs</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="2">
+<p class="q">Why keep a full gallery instead of one averaged vector?</p>
+<div class="options">
+<button class="opt" data-correct="true">Pose and lighting vary appearance</button>
+<button class="opt">Averaging reduces total memory usage</button>
+<button class="opt">Single vectors compute distance faster</button>
+<button class="opt">Kalman filter requires multiple states</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="quiz" data-q="3">
+<p class="q">What happens when a track's gallery reaches capacity?</p>
+<div class="options">
+<button class="opt" data-correct="true">Oldest stored vector evicted</button>
+<button class="opt">Newest stored vector discarded</button>
+<button class="opt">Gallery stops accepting matches</button>
+<button class="opt">Track gets deleted immediately</button>
+</div>
+<p class="feedback"></p>
+</div>
+
+<div class="win">
+<div class="kicker">Today's win</div>
+<p>
+You can now explain what <code>r</code> actually is (a frozen CNN's 128-dim output, L2-normalized onto a unit
+sphere), why cosine distance is the natural metric once that normalization happens, and why DeepSORT compares a
+new detection against an entire 100-entry gallery per track rather than a single running average — pose and
+lighting shift the embedding enough that "closest single memory" beats "closest to the average" for catching a
+track through appearance changes.
+</p>
+</div>
+
+<div class="source">
+<strong>Primary source for this lesson:</strong> Wojke, N., Bewley, A., &amp; Paulus, D. (2017),
+<a href="https://arxiv.org/abs/1703.07402">arXiv:1703.07402</a>, Section 2 ("Deep Appearance Descriptor") — CNN
+architecture, training set size, hypersphere projection, and the gallery/min-distance formula
+<code>d(2)(i,j) = min{1 − r<sub>j</sub><sup>T</sup>r<sub>k</sub> : r<sub>k</sub> ∈ R<sub>i</sub>}</code> are all
+stated explicitly there. See also
+<a href="../reference/0001-sort-vs-deepsort-glossary.html">Reference 0001</a> for the glossary entry and full
+formula reference.
+</div>
+
+<p class="ask-agent">Unclear why cosine distance specifically, rather than Euclidean distance on the normalized
+vectors (they're closely related, but not identical)? Worth asking before moving on.</p>
+
+<script>
+(function () {
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+  function ghost(id) { var el = document.getElementById(id); el.classList.remove('hidden'); el.classList.add('ghost'); }
+  function unghost(id) { document.getElementById(id).classList.remove('ghost'); }
+  function drawLine(id, cls) {
+    var el = document.getElementById(id);
+    el.setAttribute('class', 'viz-line drawn' + (cls ? ' ' + cls : ''));
+  }
+  function hideLine(id) {
+    document.getElementById(id).setAttribute('class', 'viz-line');
+  }
+  var aDots = ['dotA1', 'dotA2', 'dotA3', 'dotA4', 'dotA5'];
+  var bDots = ['dotB1', 'dotB2', 'dotB3', 'dotB4', 'dotB5'];
+  var aLines = ['lineA1', 'lineA2', 'lineA3', 'lineA4', 'lineA5'];
+  var newLabel = document.getElementById('newLabel');
+
+  var steps = [
+    {
+      label: 'The sphere',
+      caption: 'Every appearance vector r is L2-normalized — it lands somewhere on this circle (a 2D stand-in for the real 128-dim unit hypersphere), never off it.',
+      render: function () {
+        aDots.concat(bDots).forEach(hide);
+        hide('dotNew');
+        aLines.concat(['lineB']).forEach(hideLine);
+        newLabel.textContent = '';
+      }
+    },
+    {
+      label: "Track A's gallery",
+      caption: "Track A's gallery R_A — up to 100 past crops of the same object, spread along an arc because pose and lighting shift the embedding even for one identity.",
+      render: function () {
+        aDots.forEach(show);
+        bDots.forEach(hide);
+        hide('dotNew');
+        aLines.concat(['lineB']).forEach(hideLine);
+        newLabel.textContent = '';
+      }
+    },
+    {
+      label: "Track B's gallery",
+      caption: 'Track B — a different physical object — has its own gallery R_B, clustered in a different region of the sphere.',
+      render: function () {
+        aDots.forEach(show);
+        bDots.forEach(show);
+        hide('dotNew');
+        aLines.concat(['lineB']).forEach(hideLine);
+        newLabel.textContent = '';
+      }
+    },
+    {
+      label: 'New detection arrives',
+      caption: 'New detection j arrives — an unusual pose, near the outer edge of A\'s spread. It gets compared against every stored vector in both galleries, not just the newest one.',
+      render: function () {
+        aDots.forEach(show);
+        bDots.forEach(show);
+        show('dotNew');
+        aLines.forEach(function (id) { drawLine(id); });
+        drawLine('lineB');
+        newLabel.textContent = 'r_j (new)';
+      }
+    },
+    {
+      label: 'Minimum wins',
+      caption: 'The single nearest entry in R_A is far closer than even the nearest entry in R_B — decisively a Track A match. d(2) takes that minimum, not an average.',
+      render: function () {
+        aLines.slice(0, 4).forEach(hideLine);
+        drawLine('lineA5', 'win');
+        drawLine('lineB', 'lose');
+        newLabel.textContent = 'r_j → matches A';
+      }
+    },
+    {
+      label: 'Gallery updates',
+      caption: 'j is appended to R_A. The real gallery caps at 100 — at capacity, the oldest entry (here, A1) is evicted, first in first out.',
+      render: function () {
+        hideLine('lineA5');
+        hideLine('lineB');
+        document.getElementById('dotNew').setAttribute('class', 'viz-dot a');
+        ghost('dotA1');
+        newLabel.textContent = 'A1 evicted (oldest)';
+      }
+    }
+  ];
+
+  createStepPlayer(document.getElementById('galleryViz'), steps, { interval: 2000 });
+})();
+</script>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answered = false;
+  quiz.querySelectorAll('button.opt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var correct = btn.getAttribute('data-correct') === 'true';
+      quiz.querySelectorAll('button.opt').forEach(function (b) {
+        if (b.getAttribute('data-correct') === 'true') b.classList.add('correct');
+        else if (b === btn) b.classList.add('wrong');
+      });
+      quiz.querySelector('.feedback').textContent = correct
+        ? 'Correct.'
+        : 'Not quite — correct answer highlighted above.';
+    });
+  });
+});
+</script>
+
+</body>
+</html>

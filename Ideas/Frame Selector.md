@@ -1,0 +1,3 @@
+- need extra image for select best image to do ReID and Classification
+- [[Few]] told me that will be good if we no need to depend on `-extra` cause it be reduce human judgement what is the best extra line to draw
+- i think i will use extract-extend that use parent can use all tracked image

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 1 — Why TLS</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="lesson">
+
+  <div class="crumbs">Learning &rsaquo; HTTPS deployment &rsaquo; Lesson 1 of N</div>
+
+  <p class="kicker">Lesson 1</p>
+  <h1>Why your security team said no to HTTP</h1>
+  <p class="subtitle">The one idea underneath every TLS decision you'll make on <code>real-time-manager-pipeline</code>.</p>
+
+  <div class="win">
+    <strong>By the end of this lesson</strong>
+    You can explain, in one sentence, what plain HTTP is missing and what TLS adds — using the words <em>confidentiality</em>, <em>integrity</em>, and <em>authentication</em> correctly.
+  </div>
+
+  <h2>What HTTP actually sends</h2>
+  <p>
+    Right now <code>real-time-manager-pipeline</code> serves <code>http://0.0.0.0:8000</code>. HTTP is just text over a TCP socket — no scrambling, no wrapper. Anyone who can see the network traffic (a router in between, a shared Wi-Fi, a compromised switch) can read every request and response byte-for-byte. Headers, API keys, JSON bodies — all in the clear.
+  </p>
+  <div class="figure">client  ──plaintext request──▶  server
+client  ◀─plaintext response──  server
+
+        ↑ anyone on the path can read this, or edit it, undetected</div>
+  <p>
+    That's the finding your security team is reacting to. Not "the app is insecure" in some vague sense — specifically: <strong>nothing stops an eavesdropper from reading traffic, and nothing stops a tamperer from changing it in flight.</strong>
+  </p>
+
+  <h2>What TLS adds</h2>
+  <p>TLS (Transport Layer Security — the "S" in HTTPS) wraps that same TCP connection in a layer that gives you three properties:</p>
+
+  <h3>1. Confidentiality</h3>
+  <p>The client and server agree on a shared secret key (via asymmetric key exchange, then fast symmetric encryption for the actual data) so the payload is unreadable to anyone in the middle.</p>
+
+  <h3>2. Integrity</h3>
+  <p>Each message carries a cryptographic check. If a single bit is altered in transit, the receiver detects it and drops the connection instead of silently accepting corrupted data.</p>
+
+  <h3>3. Authentication</h3>
+  <p>This is the one that involves <strong>certificates</strong>. The server presents a certificate — a document containing its public key and identity claim (e.g. "I am <code>manager.internal</code>"), digitally signed by someone. The client checks that signature to decide whether to believe the identity claim.</p>
+
+  <div class="sidenote">
+    This third property is where "self-signed" enters the picture — and it's the one your next lesson will dig into. Confidentiality and integrity work identically whether the cert is self-signed or CA-signed; only <em>authentication trust</em> differs.
+  </div>
+
+  <h2>Why this matters for your deployment</h2>
+  <p>
+    Today, <code>docker-compose.yml</code> exposes port <code>8000</code> over plain HTTP. Any client talking to it — including anything crossing a network segment you don't fully control — is exposed on all three properties above. Switching to HTTPS with a cert (self-signed, per your security team's instruction) fixes confidentiality and integrity outright, and gives you a form of authentication that's weaker than a public CA cert but still meaningfully better than nothing — more on that trade-off next lesson.
+  </p>
+
+  <h2>Check yourself</h2>
+
+  <div class="quiz" data-answer="A">
+    <div class="q">1. TLS mainly protects data in transit from being ___ or modified by attackers.</div>
+    <label><input type="radio" name="q1" value="A"> read openly</label>
+    <label><input type="radio" name="q1" value="B"> sent slowly</label>
+    <label><input type="radio" name="q1" value="C"> cached briefly</label>
+    <label><input type="radio" name="q1" value="D"> routed twice</label>
+    <div class="feedback correct">Right — that's confidentiality: unreadable to anyone but the two endpoints.</div>
+    <div class="feedback wrong">Not quite. Think about what an eavesdropper on the wire could otherwise do with plaintext.</div>
+  </div>
+
+  <div class="quiz" data-answer="C">
+    <div class="q">2. Which property means a tampered message gets detected instead of silently accepted?</div>
+    <label><input type="radio" name="q2" value="A"> confidentiality</label>
+    <label><input type="radio" name="q2" value="B"> authentication</label>
+    <label><input type="radio" name="q2" value="C"> integrity</label>
+    <label><input type="radio" name="q2" value="D"> compression</label>
+    <div class="feedback correct">Right — integrity is the "did anyone touch this in flight" check.</div>
+    <div class="feedback wrong">Not quite. Re-read the three properties above — one of them is specifically about tamper detection.</div>
+  </div>
+
+  <div class="quiz" data-answer="B">
+    <div class="q">3. A certificate is best described as a public key bundled with a signed ___.</div>
+    <label><input type="radio" name="q3" value="A"> port number</label>
+    <label><input type="radio" name="q3" value="B"> identity claim</label>
+    <label><input type="radio" name="q3" value="C"> traffic log</label>
+    <label><input type="radio" name="q3" value="D"> retry policy</label>
+    <div class="feedback correct">Right — a cert says "here's a public key, and here's who I claim to be," signed by someone.</div>
+    <div class="feedback wrong">Not quite. Look at the authentication paragraph above — what does the server claim, alongside its key?</div>
+  </div>
+
+  <h2>Primary source</h2>
+  <p class="links">
+    Read: <a href="https://developer.mozilla.org/en-US/docs/Web/Security/Transport_Layer_Security" target="_blank" rel="noopener">MDN — Transport Layer Security (TLS)</a> — the plain-language overview this lesson is grounded in.
+  </p>
+
+  <div class="ask-agent">
+    Stuck on anything above, or want it explained a different way? Ask your agent — that's what it's there for. Next lesson: what "self-signed" actually means, and why your browser will complain about it (and why that's expected here).
+  </div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
