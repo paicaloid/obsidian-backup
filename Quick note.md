@@ -134,3 +134,18 @@ Tuck
 - design how to store data for easy
 - 
 - compare to next frame to set threshold to group person
+
+
+JJ
+- investigate similarity of diff person but near with same person but far away. compare si,ilarity
+- note that center not good for reid
+- det_confidence change a way to select images between same person and diff person
+next plan
+- goal is how to select best image from reid
+- update so web tool for interactive
+- create a how to calculate how to measure way
+
+Tuck 
+- run offine deepsort
+- fix video `seacon`
+- 
