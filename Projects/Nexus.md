@@ -54,6 +54,26 @@ GQ is the example. For another Nexus project, use its own project folder and cam
 
 **Change notes:** `fan_angle: 360` disables the facing-direction check; values below 360 enable the facing arc when pose keypoints exist. `proximity_distance` is distinct from `moving_distance_deadzone_radius`. The no-passerby `bin` is a histogram boundary list: its first value excludes shorter visits from `_total`, while the later values define reporting ranges. Quality engagement uses a calculated duration strictly greater than its threshold. If Greet Time changes, recheck the on-time criteria adjustment in the pre-processor.
 
+## Pong config API update (2026-10-19)
+
+The Pong screenshot's Staff Engagement settings map to the four regular `*-engage.json` files in `deepvision-config-api-server/configs/v1/counter/proximity/pong/` (SCSQ and TMBKP, cameras 33 and 34). Set `config.counter.cross.fan_angle` from 360 to 180 degrees and `config.counter.cross.proximity_count_seconds` from 7 to 10 seconds. `proximity_distance` was already 2 m. These values now match the screenshot's Staff Engagement row.
+
+The four `*-engage-loose.json` files already have the screenshot's greeting values (360 degrees, 2 m, 2 seconds); the two entrance JSON files already have `count_generation_lifespan: 10` for Traffic / U-Turn. They were unchanged.
+
+Traffic / Exclude Passerby (60 seconds), On-Time Greeting Rate / Criteria (30 seconds), and Quality engagement rate / Engagement Time (15 seconds) belong in `deepvision-pre-processor`. Three attempted Pong pre-processor JSON files were removed at the user's request; the user will set those values there. No Pong pre-processor config files from this change remain.
+
+Validation: all modified JSON files parsed; checked the four regular engage, four loose, and two entrance values; `git diff --check` passed. No deployment or full pipeline run.
+
+## Pong pre-processor effective date (2026-10-20)
+
+The user added `deepvision-pre-processor/configs/pong/` (53 JSON files). Its three screenshot-related analytics values were already present: no-passerby `bin` starts at 60 seconds, loose engagement `ontime_engagement_threshold` is 28 seconds for the 30-second business criterion after the 2-second proximity threshold, and regular engagement `quality_engagement_duration_threshold` is 15 seconds. The no-passerby report points to the corresponding aggregates.
+
+Changed every Pong `effective_date` from `2026-07-15` to `2026-10-01`: 29 fields across 29 JSON files. Verified that all 53 JSON files parse and all 29 date fields have the requested value. The Pong directory is still untracked in Git; deployment and full pipeline behavior were not tested.
+
+## Pong tourist property mapping (2026-10-20)
+
+Changed all 16 `ethnicity` references across 14 files under `deepvision-pre-processor/configs/pong/` to `est_tourist`, including the two `by_ethnicity` aggregator flags, now `by_est_tourist`. Pong's config API task files already use the `pong_est_tourist` queue, and the pre-processor supports the `by_est_tourist` flag. Verified that all 53 Pong JSON files parse and no `ethnicity` references remain in the Pong directory. No deployment or pipeline test.
+
 ## Unresolved values
 - Staff Engagement is mapped to regular `*-engage.json` (user-confirmed). Its spreadsheet values—posture 180°, distance 1.5 m, engagement 5 sec—still differ from the GQ counter values `fan_angle: 360`, `proximity_distance: 2`, `proximity_count_seconds: 7`. The meaning or source of those spreadsheet values remains unresolved.
 - Quality engagement rate spreadsheet: posture 360° matches regular `*-engage.json` `fan_angle: 360`; distance 1.5 m does not match its `proximity_distance: 2`.
@@ -68,6 +88,7 @@ GQ is the example. For another Nexus project, use its own project folder and cam
 
 ## Progress log
 ### 2026-10-19
+- Updated four Pong config API regular engagement files to 180-degree `fan_angle` and 10-second `proximity_count_seconds`, matching the Staff Engagement screenshot; JSON and diff checks passed. Removed the attempted Pong pre-processor files at user request; its three remaining settings are user-owned. No deployment.
 - Expanded the parameter summary table with the exact repository, GQ JSON location, and JSON key for every screenshot setting.
 - Documented exact GQ edit locations and current value mismatches for future Nexus parameter changes. User suspects the screenshot may differ from production; discussion with Fir is pending. No config or production values were changed.
 - User confirmed Staff Engagement maps to `*-engage` and On-Time Greeting Rate maps to `*-engage-loose`; their differing spreadsheet parameter values remain open.

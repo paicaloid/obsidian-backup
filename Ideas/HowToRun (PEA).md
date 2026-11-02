@@ -104,19 +104,27 @@ Steps:
 
 ## Common errors (notes)
 
-| Message | Cause | Fix |
-|---|---|---|
-| `workbook not found for <type>: <path>` | wrong `INPUT_DIR`, or dataset dir missing the `2_x_*/csv/*.xlsx` | check `.env` `INPUT_DIR`, confirm the xlsx exists |
-| `worksheet '<tab>' not found ... available: ...` | tab name typo (must be exact, e.g. `2.3.1`) | copy exact name from the picker / listed available |
-| `worksheet '<tab>' has no 'camera_name' column` | wrong sheet or bad header row | verify sheet has `camera_name` header |
-| `worksheet '<tab>' has no camera names` | camera column empty | fill camera_name rows |
-| `no routed worksheets for <type>` / `no incident-routed worksheets` | tab not mapped in `record_map.json` | add sheet to `record_map.json` raw/incident |
-| `MongoDB collection not configured for <type>` | missing collection in config | set `mongodb_config.collections[type]` |
-| `exporter file not found` / `has no configured type` / `has no extra preset` | bad `config/exporter.json` or wrong `--preset` | check preset name (`thai_a`/`thai_b`), file path |
-| `sync file has no '<preset>' column` | preset column missing in `sync_name_export.csv` | add the column |
-| `image_name has no FID token / no trailing epochs / no ... prefix` | stored image_name not in expected format | data issue — record's image_name malformed |
-| `WARN S3 (default): SSLError ...` | self-signed S3 cert | expected, ignore (`PATH_ADAPTER_S3_INSECURE=1`) |
-| `S3 listing failed ...` / `skip <name>: ...` on export/delete | S3 unreachable or object missing | non-fatal — Mongo op still runs; check S3 creds/endpoint |
-| `Run failed (exit N)` after progress bars | real subprocess errored (SIMULATE_UI hid it) | error output printed below the bars; read it |
-| Menu frozen / no arrow keys | not a real TTY (piped run) | falls back to numbered input — type the number |
-| `pymongo ... ServerSelectionTimeoutError` | DB URL wrong / DB down | check `PROJECT_DATABASE_URL`, `INCIDENT_DATABASE_URL`, run `script_check_connectivity.py` |
+| Message                                                                      | Cause                                                            | Fix                                                                                       |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `workbook not found for <type>: <path>`                                      | wrong `INPUT_DIR`, or dataset dir missing the `2_x_*/csv/*.xlsx` | check `.env` `INPUT_DIR`, confirm the xlsx exists                                         |
+| `worksheet '<tab>' not found ... available: ...`                             | tab name typo (must be exact, e.g. `2.3.1`)                      | copy exact name from the picker / listed available                                        |
+| `worksheet '<tab>' has no 'camera_name' column`                              | wrong sheet or bad header row                                    | verify sheet has `camera_name` header                                                     |
+| `worksheet '<tab>' has no camera names`                                      | camera column empty                                              | fill camera_name rows                                                                     |
+| `no routed worksheets for <type>` / `no incident-routed worksheets`          | tab not mapped in `record_map.json`                              | add sheet to `record_map.json` raw/incident                                               |
+| `MongoDB collection not configured for <type>`                               | missing collection in config                                     | set `mongodb_config.collections[type]`                                                    |
+| `exporter file not found` / `has no configured type` / `has no extra preset` | bad `config/exporter.json` or wrong `--preset`                   | check preset name (`thai_a`/`thai_b`), file path                                          |
+| `sync file has no '<preset>' column`                                         | preset column missing in `sync_name_export.csv`                  | add the column                                                                            |
+| `image_name has no FID token / no trailing epochs / no ... prefix`           | stored image_name not in expected format                         | data issue — record's image_name malformed                                                |
+| `WARN S3 (default): SSLError ...`                                            | self-signed S3 cert                                              | expected, ignore (`PATH_ADAPTER_S3_INSECURE=1`)                                           |
+| `S3 listing failed ...` / `skip <name>: ...` on export/delete                | S3 unreachable or object missing                                 | non-fatal — Mongo op still runs; check S3 creds/endpoint                                  |
+| `Run failed (exit N)` after progress bars                                    | real subprocess errored (SIMULATE_UI hid it)                     | error output printed below the bars; read it                                              |
+| Menu frozen / no arrow keys                                                  | not a real TTY (piped run)                                       | falls back to numbered input — type the number                                            |
+| `pymongo ... ServerSelectionTimeoutError`                                    | DB URL wrong / DB down                                           | check `PROJECT_DATABASE_URL`, `INCIDENT_DATABASE_URL`, run `script_check_connectivity.py` |
+
+
+
+
+MBK
+one-siam
+pdp
+icon

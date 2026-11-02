@@ -11,6 +11,9 @@ tags:
 ## Overview
 <!-- What is this project and why does it exist -->
 
+## Sub-projects
+- [[icon-siam]]
+
 ## Goal / Success criteria
 <!-- What does "done" look like -->
 

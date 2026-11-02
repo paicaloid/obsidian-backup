@@ -53,3 +53,22 @@ Commit-log milestones (author: me, 48 of 50 commits, 2026-06 to 2026-10):
 
 ## Notes & decisions
 <!-- Observations, blockers, trade-offs -->
+
+### 2026-10-26 — Vikunja task organization
+- Moved seven direct subtasks of the Real Time Core Pipeline parent task from Pipeline (WIP) into the dedicated Real Time Core Pipeline project. The eighth subtask was already there.
+- Kept the parent/subtask relations. Verified all eight tasks in the destination project's List and Kanban views; they appear in the To-Do bucket.
+- Used the signed-in Vikunja UI because the saved Keychain API token was unavailable to this session and the shell could not resolve the Vikunja host.
+
+### 2026-10-26 — Label confidence weights guide
+- Documented the admin workflow under Label Weights: select a camera, edit Default or Camera Override, save, then reload and check Effective and the status message. Captured and embedded a screenshot from the test admin UI.
+- `prompt_based_main.py` starts `EventDetectorPipelineProcessor`. The local config adapter resolves each prompt's camera override before `<default>` from `configs/detector_parameters/open_clip.json`; an unset weight falls back to 1 during decoding. In pooling mode, prompt scores are normalized after weighting.
+- The admin save route persists the detector parameters and queues a runtime refresh for the selected camera when active. Verified the wiki text and image survived reload. No detector values or camera configuration changed.
+
+### 2026-10-26 — Weight verification and text cache clarification
+- `Save Weights` persists detector parameters; the UI Refresh/File Editor checks stored values. For an active camera, the queued runtime refresh clears cached camera state on the next pipeline loop, and subsequent frames recreate it from config. The queued message alone does not prove the next frame used the weight.
+- With tuning capture enabled, new JSONL records include `label_confidence_weights`, allowing direct inspection of the values used for a frame. The detector config in this checkout uses `pointwise` decoding, where prompt logits are multiplied by their weights before confidence calculation.
+- `Save Labels and Rebuild Cache` saves Labels rows, rebuilds OpenCLIP text embeddings for the configured prompt set, and clears all event camera states/alerters. It is unnecessary for weight-only edits through the top table. Updated the project wiki and verified it after reload.
+
+### 2026-10-28 — SWIMS subtask organization
+- Moved five direct subtasks of the [[SWIMS]] parent task from Pipeline (WIP) to the Real Time Core Pipeline Vikunja project. The sixth subtask was already in the destination.
+- Verified all six task project IDs are 189 and each retains parent task 3919; the parent still lists all six subtasks. No blocker.

@@ -19,6 +19,9 @@ Project changes and bug fixes from server sessions reach the laptop Obsidian mem
 - Verified SSH and rsync connectivity, and passed idempotence and invalid-path tests. No server sessions were present to import.
 - Sync is on demand: run the laptop importer after server work.
 
+### 2026-10-26
+- Installed `conversation-to-vikunja-task` in the local Codex skills directory. It distinguishes review drafts from authorized creation, uses the scoped Vikunja API token, checks for duplicates and project conventions, asks about unclear project/labels, and verifies saved task properties. Ruby YAML/field validation passed and the installed copy matches the draft; skill-creator Python validation could not start because PyYAML is absent.
+
 ## Notes & decisions
 - Keep the personal vault on the laptop; the server stores only concise project-session summaries.
 

@@ -36,3 +36,6 @@ Operate fleets of real-time pipeline containers without editing JSON on servers:
 
 ## Notes & decisions
 - Manager repo has `.env`, `pgdata/`, and `.ssh/manager-private.pem` in the working tree; verify they are git-ignored.
+
+### 2026-10-29
+- Added `LocalForward 27017 localhost:27017` to `~/.ssh/tunnel_icon` under `tunnel-rtpl-manager`, alongside the existing manager forward. The MongoDB container publishes port 27017 on the same remote host. `ssh -G tunnel-rtpl-manager` shows both forwards; a live MongoDB connection is still unverified. Use `ssh -N tunnel-rtpl-manager` and connect to `mongodb://127.0.0.1:27017` while the tunnel is open.
