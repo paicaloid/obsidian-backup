@@ -13,6 +13,9 @@ Configuration and workflows for Codex across laptop and server.
 Project changes and bug fixes from server sessions reach the laptop Obsidian memory.
 
 ## Progress log
+### 2026-11-02
+- Set the global Codex `AGENTS.md` to read the Obsidian memory index, save explicit remember requests, and record one dated note before ending each session. Updated the index to cover Codex as well as Claude; verified both instruction files. This is an agent instruction, so abrupt session termination can still prevent a final record.
+
 ### 2026-10-19
 - Added a project-session outbox rule to the global Codex instructions on server-25006.
 - Created `sync_server_25006_memory.py` on the laptop to pull session notes into Memory/Projects.md and the matching Projects note.

@@ -1,6 +1,6 @@
 ﻿# Memory
 
-Personal memory for Claude. Loaded automatically in every Claude Code session.
+Personal memory for Claude and Codex. Claude Code loads this index automatically; Codex reads it through the global `AGENTS.md`.
 Keep it short and factual. Never store passwords, API keys, or ID/financial numbers.
 
 ## Notes
@@ -15,7 +15,7 @@ Keep it short and factual. Never store passwords, API keys, or ID/financial numb
 - [[Decisions]] - dated log of choices and why
 - [[Inbox]] - quick captures to sort later
 
-## Instructions for Claude
-- When I say "remember ...", add a short bullet to the best-fitting note above (or [[Inbox]] if unsure).
+## Instructions for assistants
+- When I say "remember ..." or ask you to record something, add a short bullet to the best-fitting note above (or [[Inbox]] if unsure).
 - Use `[[links]]` between notes. Date entries in Decisions as YYYY-MM-DD.
 - Read the individual notes on demand when relevant; this index is what is always loaded.

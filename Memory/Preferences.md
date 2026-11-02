@@ -11,6 +11,7 @@
 - Outside work: casual and direct, light humor. Use memory only when relevant, never open with it.
 
 ## Tools & conventions
+- For Vikunja task work, focus on [Pipeline (WIP)](https://vikunja.oxygenci.com/projects/165) and all its subprojects; this is where I mainly add my tasks.
 - Projects live in WSL (`/home/pai/...`); I prefer Linux over Windows.
 - Notes live in Obsidian; Git syncs the vault (repo `paicaloid/obsidian-sync`, Obsidian Git plugin).
 - Python projects use `uv`; deployment via Docker Compose.

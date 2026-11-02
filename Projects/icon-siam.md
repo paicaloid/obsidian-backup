@@ -123,3 +123,6 @@ Open:
 
 ## Notes & decisions
 <!-- Observations, blockers, trade-offs -->
+
+### 2026-11-02 — Local Mongo backup
+- Copied the full 2026-11-01 Bangkok day from production `deepvision-icon-siam` to local Mongo using the date-range CLI. The run upserted 2,799,245 records: `customers` 1,408,278; `customers-count` 135,022; `customers-reverse` 1,255,945. Seven other included collections had no matching records. The `customers-feature` collection was excluded and was not created locally. Verified source and local counts for the date range and full index definitions across all ten included collections. Production data was read only.
