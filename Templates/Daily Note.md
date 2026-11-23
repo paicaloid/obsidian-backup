@@ -1,23 +1,16 @@
 ---
-date: <% tp.date.now("YYYY-MM-DD") %>
-day: <% tp.date.now("dddd") %>
+date: "{{date:YYYY-MM-DD}}"
+day: "{{date:dddd}}"
 ---
 
-# <% tp.date.now("dddd, MMMM D YYYY") %>
+# {{date:dddd, MMMM D YYYY}}
 
-## Focus for today
+## Did
+- 
+## Learned
+- 
+## Decided
 - 
 
-## What came in today
-<!-- Ad-hoc requests, interruptions, new asks -->
-
-## Conversations
-<!-- Who reached out / who you talked to, and about what -->
-
-## Tasks
-- [ ] 
-
-## Notes & observations
-
-## End of day
-<!-- What got done, what carries over -->
+## Tomorrow
+- 
